@@ -240,6 +240,7 @@ pub(super) fn snapshot(
         panes,
         agents,
         commands: app.client_shell_command_manifest(),
+        plugin_resources: app.state.plugin_resources.clone(),
     }
 }
 

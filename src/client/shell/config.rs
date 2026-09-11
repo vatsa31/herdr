@@ -56,6 +56,9 @@ impl ClientShellState {
             sidebar_collapsed: self
                 .sidebar_collapsed_manual
                 .then_some(self.sidebar_collapsed),
+            plugin_resource_collapsed: self
+                .plugin_resource_collapsed_manual
+                .then_some(self.plugin_resource_collapsed),
             agent_panel_sort: self
                 .agent_panel_sort_manual
                 .then_some(self.config.agent_panel_sort),

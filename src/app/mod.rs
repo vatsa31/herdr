@@ -155,6 +155,8 @@ pub struct App {
     pub(crate) render_dirty: Arc<crate::render_signal::RenderSignal>,
     pub(crate) full_redraw_pending: bool,
     pub(crate) overlay_panes: HashMap<crate::layout::PaneId, OverlayPaneState>,
+    pub(crate) plugin_resource_jobs:
+        HashMap<String, crate::app::api::plugins::resources::PluginResourceJob>,
     pub(crate) config_reloaded_from_disk: bool,
     client_shell_keybindings_profile: Option<String>,
     endpoint_commands: custom_commands::EndpointCommandRegistry,
@@ -514,6 +516,7 @@ impl App {
             agent_manifest_summaries,
             agent_manifest_update_status: crate::detect::manifest_update::load_status(),
             installed_plugins: load_plugin_registry(policy.persist_plugin_registry),
+            plugin_resources: Vec::new(),
             plugin_panes: std::collections::HashMap::new(),
             popup_pane: None,
             plugin_command_logs: Vec::new(),
@@ -617,12 +620,14 @@ impl App {
             render_dirty,
             full_redraw_pending: false,
             overlay_panes: HashMap::new(),
+            plugin_resource_jobs: HashMap::new(),
             config_reloaded_from_disk: false,
             client_shell_keybindings_profile,
             endpoint_commands,
         };
         app.configure_tab_bar_status(&config.ui.tab_bar_right, &config.ui.tab_bar_right_separator);
         app.configure_window_title(&config.ui.window_title);
+        app.sync_plugin_resources(Instant::now());
         app
     }
 

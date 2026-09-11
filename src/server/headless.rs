@@ -3368,6 +3368,7 @@ impl HeadlessServer {
         }
 
         changed |= self.app.handle_tab_bar_status_tasks(now);
+        changed |= self.app.tick_plugin_resources(now);
 
         if geometry_dirty {
             self.app.pending_agent_resume_deadline = None;

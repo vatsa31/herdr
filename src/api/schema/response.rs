@@ -291,6 +291,18 @@ pub enum ResponseResult {
     PluginPaneClosed {
         pane_id: String,
     },
+    PluginResourceList {
+        resources: Vec<super::plugins::PluginResourceCollection>,
+    },
+    PluginResourceRefreshed {
+        resource: super::plugins::PluginResourceCollection,
+    },
+    PluginResourceActivated {
+        plugin_id: String,
+        resource_id: String,
+        item_id: String,
+        log: PluginCommandLogInfo,
+    },
     ConfigReload {
         status: crate::config::ConfigReloadStatus,
         diagnostics: Vec<String>,

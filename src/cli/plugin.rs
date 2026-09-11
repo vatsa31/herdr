@@ -9,7 +9,8 @@ use crate::api::schema::{
     InstalledPluginInfo, Method, PluginActionInvokeParams, PluginActionListParams,
     PluginInvocationContext, PluginLinkParams, PluginListParams, PluginLogListParams,
     PluginPaneCloseParams, PluginPaneFocusParams, PluginPaneOpenParams, PluginPanePlacement,
-    PluginPlatform, PluginSetEnabledParams, PluginSourceInfo, PluginSourceKind, PluginUnlinkParams,
+    PluginPlatform, PluginResourceActivateParams, PluginResourceListParams, PluginResourceTarget,
+    PluginSetEnabledParams, PluginSourceInfo, PluginSourceKind, PluginUnlinkParams,
     Request, ResponseResult, SplitDirection, SuccessResponse,
 };
 use crate::popup_size::PopupSize;
@@ -34,6 +35,7 @@ pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
         "action" => run_plugin_action_command(&args[1..]),
         "log" | "logs" => plugin_log_list(&args[1..]),
         "pane" => run_plugin_pane_command(&args[1..]),
+        "resource" => run_plugin_resource_command(&args[1..]),
         "help" | "--help" | "-h" => {
             print_plugin_help();
             Ok(0)
@@ -639,16 +641,42 @@ fn parse_popup_dimension(value: &str, flag: &str) -> Option<PopupSize> {
 }
 
 fn plugin_pane_focus(args: &[String]) -> std::io::Result<i32> {
-    let Some(pane_id) = args.first() else {
-        eprintln!("usage: herdr plugin pane focus <pane_id>");
-        return Ok(2);
-    };
-    if args.len() != 1 {
-        eprintln!("usage: herdr plugin pane focus <pane_id>");
+    let mut pane_id = None;
+    let mut plugin_id = None;
+    let mut entrypoint = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--plugin" => {
+                let Some(value) = required_value(args, &mut index, "--plugin") else {
+                    return Ok(2);
+                };
+                plugin_id = Some(value);
+            }
+            "--entrypoint" => {
+                let Some(value) = required_value(args, &mut index, "--entrypoint") else {
+                    return Ok(2);
+                };
+                entrypoint = Some(value);
+            }
+            value if !value.starts_with('-') && pane_id.is_none() => {
+                pane_id = Some(super::normalize_pane_id(value));
+                index += 1;
+            }
+            _ => {
+                eprintln!("usage: herdr plugin pane focus <pane_id> | --plugin ID --entrypoint ID");
+                return Ok(2);
+            }
+        }
+    }
+    if pane_id.is_none() && (plugin_id.is_none() || entrypoint.is_none()) {
+        eprintln!("usage: herdr plugin pane focus <pane_id> | --plugin ID --entrypoint ID");
         return Ok(2);
     }
     print_plugin_response(Method::PluginPaneFocus(PluginPaneFocusParams {
-        pane_id: super::normalize_pane_id(pane_id),
+        pane_id: pane_id.unwrap_or_default(),
+        plugin_id,
+        entrypoint,
     }))
 }
 
@@ -1665,6 +1693,7 @@ fn print_plugin_help() {
     eprintln!("  herdr plugin action <list|invoke>");
     eprintln!("  herdr plugin log list [--plugin ID] [--limit N]");
     eprintln!("  herdr plugin pane <open|focus|close>");
+    eprintln!("  herdr plugin resource <list|refresh|activate>");
 }
 
 fn print_plugin_action_help() {
@@ -1677,7 +1706,134 @@ fn print_plugin_pane_help() {
     eprintln!("herdr plugin pane commands:");
     eprintln!("  herdr plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]");
     eprintln!("  herdr plugin pane focus <pane_id>");
+    eprintln!("  herdr plugin pane focus --plugin ID --entrypoint ID");
     eprintln!("  herdr plugin pane close <pane_id>");
+}
+
+fn run_plugin_resource_command(args: &[String]) -> std::io::Result<i32> {
+    let Some(subcommand) = args.first().map(|arg| arg.as_str()) else {
+        print_plugin_resource_help();
+        return Ok(2);
+    };
+    match subcommand {
+        "list" => plugin_resource_list(&args[1..]),
+        "refresh" => plugin_resource_refresh(&args[1..]),
+        "activate" => plugin_resource_activate(&args[1..]),
+        "help" | "--help" | "-h" => {
+            print_plugin_resource_help();
+            Ok(0)
+        }
+        _ => {
+            print_plugin_resource_help();
+            Ok(2)
+        }
+    }
+}
+
+fn plugin_resource_list(args: &[String]) -> std::io::Result<i32> {
+    let mut plugin_id = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--plugin" => {
+                let Some(value) = required_value(args, &mut index, "--plugin") else {
+                    return Ok(2);
+                };
+                plugin_id = Some(value);
+            }
+            _ => {
+                print_plugin_resource_help();
+                return Ok(2);
+            }
+        }
+    }
+    print_plugin_response(Method::PluginResourceList(PluginResourceListParams {
+        plugin_id,
+    }))
+}
+
+fn plugin_resource_refresh(args: &[String]) -> std::io::Result<i32> {
+    let mut plugin_id = None;
+    let mut resource_id = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--plugin" => {
+                let Some(value) = required_value(args, &mut index, "--plugin") else {
+                    return Ok(2);
+                };
+                plugin_id = Some(value);
+            }
+            "--resource" => {
+                let Some(value) = required_value(args, &mut index, "--resource") else {
+                    return Ok(2);
+                };
+                resource_id = Some(value);
+            }
+            _ => {
+                print_plugin_resource_help();
+                return Ok(2);
+            }
+        }
+    }
+    let (Some(plugin_id), Some(resource_id)) = (plugin_id, resource_id) else {
+        print_plugin_resource_help();
+        return Ok(2);
+    };
+    print_plugin_response(Method::PluginResourceRefresh(PluginResourceTarget {
+        plugin_id,
+        resource_id,
+    }))
+}
+
+fn plugin_resource_activate(args: &[String]) -> std::io::Result<i32> {
+    let mut plugin_id = None;
+    let mut resource_id = None;
+    let mut item_id = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--plugin" => {
+                let Some(value) = required_value(args, &mut index, "--plugin") else {
+                    return Ok(2);
+                };
+                plugin_id = Some(value);
+            }
+            "--resource" => {
+                let Some(value) = required_value(args, &mut index, "--resource") else {
+                    return Ok(2);
+                };
+                resource_id = Some(value);
+            }
+            "--item" => {
+                let Some(value) = required_value(args, &mut index, "--item") else {
+                    return Ok(2);
+                };
+                item_id = Some(value);
+            }
+            _ => {
+                print_plugin_resource_help();
+                return Ok(2);
+            }
+        }
+    }
+    let (Some(plugin_id), Some(resource_id), Some(item_id)) = (plugin_id, resource_id, item_id)
+    else {
+        print_plugin_resource_help();
+        return Ok(2);
+    };
+    print_plugin_response(Method::PluginResourceActivate(PluginResourceActivateParams {
+        plugin_id,
+        resource_id,
+        item_id,
+    }))
+}
+
+fn print_plugin_resource_help() {
+    eprintln!("herdr plugin resource commands:");
+    eprintln!("  herdr plugin resource list [--plugin ID]");
+    eprintln!("  herdr plugin resource refresh --plugin ID --resource ID");
+    eprintln!("  herdr plugin resource activate --plugin ID --resource ID --item ID");
 }
 
 #[cfg(test)]
@@ -1723,6 +1879,7 @@ mod tests {
             events: vec![],
             panes: vec![],
             link_handlers: vec![],
+            resources: vec![],
             source: PluginSourceInfo {
                 kind: PluginSourceKind::Github,
                 owner: Some(owner.to_string()),

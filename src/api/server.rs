@@ -491,6 +491,9 @@ pub(crate) fn api_method_name(method: &Method) -> &'static str {
         Method::PluginPaneOpen(_) => "plugin.pane.open",
         Method::PluginPaneFocus(_) => "plugin.pane.focus",
         Method::PluginPaneClose(_) => "plugin.pane.close",
+        Method::PluginResourceList(_) => "plugin.resource.list",
+        Method::PluginResourceRefresh(_) => "plugin.resource.refresh",
+        Method::PluginResourceActivate(_) => "plugin.resource.activate",
     }
 }
 

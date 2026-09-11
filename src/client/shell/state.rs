@@ -156,6 +156,14 @@ pub(super) struct ShellHitMap {
     pub(super) agent_scroll_metrics: Option<crate::pane::ScrollMetrics>,
     pub(super) agent_max_scroll: usize,
     pub(super) agent_sort_toggle: Rect,
+    pub(super) resource_header: Rect,
+    pub(super) resource_refresh: Rect,
+    pub(super) resource_body: Rect,
+    pub(super) resource_items: Vec<(Rect, String, String, String)>,
+    pub(super) resource_scrollbar: Rect,
+    pub(super) resource_scroll_metrics: Option<crate::pane::ScrollMetrics>,
+    pub(super) resource_max_scroll: usize,
+    pub(super) resource_section_divider: Rect,
     pub(super) sidebar_divider: Rect,
     pub(super) sidebar_section_divider: Rect,
     pub(super) sidebar_toggle: Rect,
@@ -247,6 +255,9 @@ pub(super) enum ClientChromeDrag {
         grab_row_offset: u16,
     },
     AgentScrollbar {
+        grab_row_offset: u16,
+    },
+    ResourceScrollbar {
         grab_row_offset: u16,
     },
     HelpScrollbar {
@@ -914,6 +925,10 @@ pub(crate) struct ClientShellState {
     pub(super) remote_collapsed_groups: HashMap<ClientEndpointId, HashSet<String>>,
     pub(super) workspace_scroll: usize,
     pub(super) agent_scroll: usize,
+    pub(super) plugin_resource_scroll: usize,
+    pub(super) plugin_resource_collapsed: bool,
+    pub(super) plugin_resource_collapsed_manual: bool,
+    pub(super) plugin_resource_selected: Option<String>,
     pub(super) tab_scroll: usize,
     pub(super) mobile_switcher_scroll: usize,
     pub(super) reveal_focused_workspace: bool,
@@ -1033,6 +1048,7 @@ impl ClientShellState {
             .filter(|split| split.is_finite())
             .map(|split| split.clamp(0.1, 0.9))
             .unwrap_or(0.5);
+        let plugin_resource_collapsed = preferences.plugin_resource_collapsed.unwrap_or(false);
         if let Some(sort) = preferences.agent_panel_sort {
             config.agent_panel_sort = sort;
         }
@@ -1072,6 +1088,10 @@ impl ClientShellState {
             remote_collapsed_groups,
             workspace_scroll: 0,
             agent_scroll: 0,
+            plugin_resource_scroll: 0,
+            plugin_resource_collapsed,
+            plugin_resource_collapsed_manual: preferences.plugin_resource_collapsed.is_some(),
+            plugin_resource_selected: None,
             tab_scroll: 0,
             mobile_switcher_scroll: 0,
             reveal_focused_workspace: true,
@@ -1254,6 +1274,7 @@ impl ClientShellState {
         self.tab_press = None;
         self.workspace_scroll = 0;
         self.agent_scroll = 0;
+        self.plugin_resource_scroll = 0;
         self.tab_scroll = 0;
         self.mobile_switcher_scroll = 0;
         self.reveal_focused_workspace = true;

@@ -264,6 +264,12 @@ pub enum Method {
     PluginPaneFocus(PluginPaneFocusParams),
     #[serde(rename = "plugin.pane.close")]
     PluginPaneClose(PluginPaneCloseParams),
+    #[serde(rename = "plugin.resource.list")]
+    PluginResourceList(PluginResourceListParams),
+    #[serde(rename = "plugin.resource.refresh")]
+    PluginResourceRefresh(PluginResourceTarget),
+    #[serde(rename = "plugin.resource.activate")]
+    PluginResourceActivate(PluginResourceActivateParams),
 }
 
 #[cfg(test)]

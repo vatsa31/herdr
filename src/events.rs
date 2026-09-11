@@ -169,6 +169,13 @@ pub enum AppEvent {
         stderr: String,
         error: Option<String>,
     },
+    /// A plugin resource provider finished a one-shot fetch.
+    PluginResourceFinished {
+        plugin_id: String,
+        resource_id: String,
+        generation: u64,
+        result: Result<crate::api::schema::PluginResourceCollection, String>,
+    },
     /// Background `git worktree add` completed.
     WorktreeAddFinished(Box<WorktreeAddResult>),
     /// Background `git worktree remove` completed.

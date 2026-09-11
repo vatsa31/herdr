@@ -3693,13 +3693,23 @@
         },
         "PluginPaneFocusParams": {
           "properties": {
+            "entrypoint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "pane_id": {
+              "default": "",
               "type": "string"
+            },
+            "plugin_id": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
-          "required": [
-            "pane_id"
-          ],
           "type": "object"
         },
         "PluginPaneOpenParams": {
@@ -3794,6 +3804,51 @@
             "zoomed"
           ],
           "type": "string"
+        },
+        "PluginResourceActivateParams": {
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "plugin_id": {
+              "type": "string"
+            },
+            "resource_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "plugin_id",
+            "resource_id",
+            "item_id"
+          ],
+          "type": "object"
+        },
+        "PluginResourceListParams": {
+          "properties": {
+            "plugin_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "PluginResourceTarget": {
+          "properties": {
+            "plugin_id": {
+              "type": "string"
+            },
+            "resource_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "plugin_id",
+            "resource_id"
+          ],
+          "type": "object"
         },
         "PluginSetEnabledParams": {
           "properties": {
@@ -6378,6 +6433,54 @@
             "params"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "plugin.resource.list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PluginResourceListParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "plugin.resource.refresh",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PluginResourceTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "plugin.resource.activate",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PluginResourceActivateParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -7607,6 +7710,12 @@
             },
             "plugin_root": {
               "type": "string"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginManifestResource"
+              },
+              "type": "array"
             },
             "source": {
               "$ref": "#/schemas/success_response/$defs/PluginSourceInfo",
@@ -9036,6 +9145,49 @@
           ],
           "type": "object"
         },
+        "PluginManifestResource": {
+          "properties": {
+            "activate_command": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "command": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "platforms": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginPlatform"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "refresh_secs": {
+              "default": 60,
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "command"
+          ],
+          "type": "object"
+        },
         "PluginManifestStartup": {
           "properties": {
             "command": {
@@ -9095,6 +9247,95 @@
             "windows"
           ],
           "type": "string"
+        },
+        "PluginResourceCollection": {
+          "properties": {
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fetched_unix_ms": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "items": {
+              "default": [],
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginResourceItem"
+              },
+              "type": "array"
+            },
+            "label": {
+              "type": "string"
+            },
+            "loading": {
+              "default": false,
+              "type": "boolean"
+            },
+            "matched_count": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "plugin_id": {
+              "type": "string"
+            },
+            "refreshing": {
+              "default": false,
+              "type": "boolean"
+            },
+            "resource_id": {
+              "type": "string"
+            },
+            "stale": {
+              "default": false,
+              "type": "boolean"
+            },
+            "truncated": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "plugin_id",
+            "resource_id",
+            "label"
+          ],
+          "type": "object"
+        },
+        "PluginResourceItem": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "payload": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "primary": {
+              "default": "",
+              "type": "string"
+            },
+            "secondary": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
         },
         "PluginSourceInfo": {
           "properties": {
@@ -10460,6 +10701,69 @@
               "required": [
                 "type",
                 "pane_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "resources": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/PluginResourceCollection"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "plugin_resource_list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "resources"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "resource": {
+                  "$ref": "#/schemas/success_response/$defs/PluginResourceCollection"
+                },
+                "type": {
+                  "const": "plugin_resource_refreshed",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "resource"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "item_id": {
+                  "type": "string"
+                },
+                "log": {
+                  "$ref": "#/schemas/success_response/$defs/PluginCommandLogInfo"
+                },
+                "plugin_id": {
+                  "type": "string"
+                },
+                "resource_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "plugin_resource_activated",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "plugin_id",
+                "resource_id",
+                "item_id",
+                "log"
               ],
               "type": "object"
             },
