@@ -229,10 +229,18 @@ pub(super) fn render_expanded(
     } else {
         Rect::new(area.right().saturating_sub(1), area.y, 1, area.height)
     };
-    let (workspace_area, detail_area) =
-        crate::ui::expanded_sidebar_sections(area, state.sidebar_section_split);
-    hits.sidebar_section_divider =
-        crate::ui::sidebar_section_divider_rect(area, state.sidebar_section_split);
+    let has_resource = active_snapshot
+        .is_some_and(|snapshot| !snapshot.plugin_resources.is_empty());
+    let sidebar_layout = crate::ui::expanded_sidebar_layout(
+        area,
+        state.sidebar_section_split,
+        has_resource,
+        !state.plugin_resource_collapsed,
+    );
+    let workspace_area = sidebar_layout.spaces;
+    let detail_area = sidebar_layout.agents;
+    hits.sidebar_section_divider = sidebar_layout.spaces_agents_divider;
+    hits.resource_section_divider = sidebar_layout.agents_resource_divider;
     put_text(
         buffer,
         workspace_area.x,
@@ -517,6 +525,18 @@ pub(super) fn render_expanded(
         state.agent_scroll,
         hits,
     );
+    if let (Some(resource_area), Some(snapshot)) = (sidebar_layout.resource, active_snapshot) {
+        super::resource_sidebar::render_plugin_resource_panel(
+            buffer,
+            resource_area,
+            snapshot,
+            config,
+            state.plugin_resource_collapsed,
+            state.plugin_resource_selected,
+            state.plugin_resource_scroll,
+            hits,
+        );
+    }
     hits.sidebar_toggle = Rect::new(
         area.right().saturating_sub(2),
         area.bottom().saturating_sub(1),

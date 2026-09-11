@@ -2,6 +2,7 @@ mod context;
 mod env;
 mod manifest;
 mod panes;
+pub(crate) mod resources;
 mod runtime;
 
 use super::responses::{encode_error, encode_success};
@@ -34,6 +35,7 @@ impl App {
             .into_iter()
             .map(|plugin| (plugin.plugin_id.clone(), plugin))
             .collect();
+        self.sync_plugin_resources(std::time::Instant::now());
     }
 
     fn refresh_installed_plugins(&mut self) -> std::io::Result<()> {
@@ -50,7 +52,9 @@ impl App {
         mutation: impl FnOnce(&mut crate::app::state::InstalledPluginRegistry) -> T,
     ) -> std::io::Result<T> {
         if !self.policy.persist_plugin_registry {
-            return Ok(mutation(&mut self.state.installed_plugins));
+            let result = mutation(&mut self.state.installed_plugins);
+            self.sync_plugin_resources(std::time::Instant::now());
+            return Ok(result);
         }
         let (result, entries) = crate::persist::plugin_registry::update(|entries| {
             let mut registry = entries
@@ -126,11 +130,11 @@ impl App {
                 }
             };
         if removed {
-            // Drop plugin_panes records for this plugin (panes keep running).
             self.state
                 .plugin_panes
                 .retain(|_, record| record.plugin_id != plugin_id);
             self.clear_agent_view_for_source(&format!("plugin:{plugin_id}"));
+            self.sync_plugin_resources(std::time::Instant::now());
         }
         encode_success(id, ResponseResult::PluginUnlinked { plugin_id, removed })
     }
@@ -522,12 +526,29 @@ impl App {
         }
     }
 
+    fn resolve_plugin_pane_focus(
+        &self,
+        params: &PluginPaneFocusParams,
+    ) -> Option<(usize, crate::layout::PaneId)> {
+        if !params.pane_id.trim().is_empty() {
+            return self.parse_pane_id(&params.pane_id);
+        }
+        let plugin_id = params.plugin_id.as_deref()?;
+        let entrypoint = params.entrypoint.as_deref()?;
+        let pane_id = self.state.plugin_panes.iter().find_map(|(pane_id, record)| {
+            (record.plugin_id == plugin_id && record.entrypoint == entrypoint).then_some(*pane_id)
+        })?;
+        self.state.workspaces.iter().enumerate().find_map(|(ws_idx, workspace)| {
+            workspace.pane_state(pane_id).map(|_| (ws_idx, pane_id))
+        })
+    }
+
     pub(super) fn handle_plugin_pane_focus(
         &mut self,
         id: String,
         params: PluginPaneFocusParams,
     ) -> String {
-        let Some((ws_idx, pane_id)) = self.parse_pane_id(&params.pane_id) else {
+        let Some((ws_idx, pane_id)) = self.resolve_plugin_pane_focus(&params) else {
             return encode_error(id, "plugin_pane_not_found", "plugin pane not found");
         };
         if !self.state.plugin_panes.contains_key(&pane_id) {
@@ -712,6 +733,7 @@ impl App {
         if !enabled {
             self.clear_agent_view_for_source(&format!("plugin:{plugin_id}"));
         }
+        self.sync_plugin_resources(std::time::Instant::now());
         if enabled {
             encode_success(id, ResponseResult::PluginEnabled { plugin })
         } else {
@@ -743,7 +765,7 @@ fn normalize_optional_plugin_id(
     }
 }
 
-fn plugin_manifest_available(plugin: &InstalledPluginInfo) -> bool {
+pub(super) fn plugin_manifest_available(plugin: &InstalledPluginInfo) -> bool {
     !plugin.warnings.iter().any(|warning| {
         warning.starts_with(crate::persist::plugin_registry::MANIFEST_UNAVAILABLE_WARNING_PREFIX)
     })
@@ -3423,6 +3445,8 @@ command = ["sh", "-c", "echo ok"]
             id: "focus".into(),
             method: Method::PluginPaneFocus(PluginPaneFocusParams {
                 pane_id: move_result.pane.pane_id.clone(),
+                plugin_id: None,
+                entrypoint: None,
             }),
         });
         let ResponseResult::PluginPaneFocused { plugin_pane } = response_result(&focus) else {

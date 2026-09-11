@@ -1,7 +1,7 @@
 use crate::api::schema::{
     InstalledPluginInfo, PluginManifestAction, PluginManifestBuild, PluginManifestEventHook,
-    PluginManifestLinkHandler, PluginManifestPane, PluginManifestStartup, PluginPanePlacement,
-    PluginPlatform, PluginSourceInfo, PluginSourceKind,
+    PluginManifestLinkHandler, PluginManifestPane, PluginManifestResource, PluginManifestStartup,
+    PluginPanePlacement, PluginPlatform, PluginSourceInfo, PluginSourceKind,
 };
 use crate::popup_size::PopupSize;
 
@@ -31,6 +31,8 @@ struct RawPluginManifest {
     panes: Vec<RawPluginManifestPane>,
     #[serde(default)]
     link_handlers: Vec<RawPluginManifestLinkHandler>,
+    #[serde(default)]
+    resources: Vec<RawPluginManifestResource>,
 }
 
 #[derive(serde::Deserialize)]
@@ -93,6 +95,19 @@ struct RawPluginManifestLinkHandler {
     action: String,
     #[serde(default)]
     platforms: Option<Vec<RawPlatform>>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawPluginManifestResource {
+    id: String,
+    title: String,
+    command: Vec<String>,
+    #[serde(default)]
+    activate_command: Vec<String>,
+    #[serde(default)]
+    platforms: Option<Vec<RawPlatform>>,
+    #[serde(default)]
+    refresh_secs: Option<u64>,
 }
 
 /// Raw string platform value from the manifest, validated before conversion.
@@ -197,6 +212,13 @@ pub(crate) fn load_plugin_manifest(
         .collect::<Result<Vec<_>, _>>()?;
     reject_duplicate_link_handler_ids(&link_handlers)?;
     validate_link_handler_actions(&link_handlers, &actions)?;
+    let mut resources = raw
+        .resources
+        .into_iter()
+        .map(normalize_manifest_resource)
+        .collect::<Result<Vec<_>, _>>()?;
+    reject_duplicate_resource_ids(&resources)?;
+    resources.sort_by(|a, b| a.id.cmp(&b.id));
 
     let mut warnings = validate_event_names(&events);
     if platforms.is_none() {
@@ -219,6 +241,7 @@ pub(crate) fn load_plugin_manifest(
         events,
         panes,
         link_handlers,
+        resources,
         source: Default::default(),
         warnings,
     })
@@ -358,6 +381,53 @@ fn reject_duplicate_link_handler_ids(
         }
     }
     Ok(())
+}
+
+fn reject_duplicate_resource_ids(
+    resources: &[PluginManifestResource],
+) -> Result<(), (&'static str, String)> {
+    let mut seen = std::collections::HashSet::new();
+    for resource in resources {
+        if !seen.insert(resource.id.as_str()) {
+            return Err((
+                "duplicate_plugin_resource_id",
+                format!("duplicate resource id '{}'", resource.id),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_manifest_resource(
+    resource: RawPluginManifestResource,
+) -> Result<PluginManifestResource, (&'static str, String)> {
+    let id = normalize_action_id(&resource.id).ok_or_else(|| {
+        (
+            "invalid_plugin_resource_id",
+            "invalid resource id".to_string(),
+        )
+    })?;
+    let title = non_empty_trimmed(
+        &resource.title,
+        "invalid_plugin_resource_title",
+        "resource title is required",
+    )?;
+    let platforms = normalize_platforms(resource.platforms)?;
+    let command = normalize_command(resource.command)?;
+    let activate_command = if resource.activate_command.is_empty() {
+        Vec::new()
+    } else {
+        normalize_command(resource.activate_command)?
+    };
+    let refresh_secs = resource.refresh_secs.unwrap_or(60).clamp(5, 3600);
+    Ok(PluginManifestResource {
+        id,
+        title,
+        command,
+        activate_command,
+        platforms,
+        refresh_secs,
+    })
 }
 
 fn validate_link_handler_actions(

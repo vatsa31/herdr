@@ -157,6 +157,23 @@ impl App {
             return Vec::new();
         }
 
+        if let AppEvent::PluginResourceFinished {
+            plugin_id,
+            resource_id,
+            generation,
+            result,
+        } = ev
+        {
+            self.handle_plugin_resource_finished(
+                plugin_id,
+                resource_id,
+                generation,
+                result,
+                Instant::now(),
+            );
+            return Vec::new();
+        }
+
         if let AppEvent::WorktreeAddFinished(result) = ev {
             self.handle_api_worktree_add_finished(*result);
             return Vec::new();
@@ -1220,6 +1237,15 @@ impl App {
             }
             Method::PluginPaneClose(params) => {
                 return self.handle_plugin_pane_close(request.id, params);
+            }
+            Method::PluginResourceList(params) => {
+                return self.handle_plugin_resource_list(request.id, params);
+            }
+            Method::PluginResourceRefresh(params) => {
+                return self.handle_plugin_resource_refresh(request.id, params);
+            }
+            Method::PluginResourceActivate(params) => {
+                return self.handle_plugin_resource_activate(request.id, params);
             }
             _ => {
                 return responses::encode_error(

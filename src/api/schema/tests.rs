@@ -1030,6 +1030,7 @@ fn plugin_link_list_unlink_round_trip() {
             action: "bootstrap".into(),
             platforms: None,
         }],
+        resources: vec![],
         source: Default::default(),
         warnings: vec![],
     };

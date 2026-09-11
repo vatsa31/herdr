@@ -59,6 +59,8 @@ pub struct InstalledPluginInfo {
     pub panes: Vec<PluginManifestPane>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub link_handlers: Vec<PluginManifestLinkHandler>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<PluginManifestResource>,
     #[serde(default)]
     pub source: PluginSourceInfo,
     /// Warnings collected at link time or on registry load (e.g. unknown event names,
@@ -453,7 +455,12 @@ pub enum PluginPanePlacement {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PluginPaneFocusParams {
+    #[serde(default)]
     pub pane_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entrypoint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -466,4 +473,74 @@ pub struct PluginPaneInfo {
     pub plugin_id: String,
     pub entrypoint: String,
     pub pane: PaneInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginManifestResource {
+    pub id: String,
+    pub title: String,
+    pub command: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activate_command: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platforms: Option<Vec<PluginPlatform>>,
+    #[serde(default = "default_resource_refresh_secs")]
+    pub refresh_secs: u64,
+}
+
+fn default_resource_refresh_secs() -> u64 {
+    60
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
+pub struct PluginResourceListParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginResourceTarget {
+    pub plugin_id: String,
+    pub resource_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginResourceActivateParams {
+    pub plugin_id: String,
+    pub resource_id: String,
+    pub item_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
+pub struct PluginResourceItem {
+    pub id: String,
+    #[serde(default)]
+    pub primary: String,
+    #[serde(default)]
+    pub secondary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginResourceCollection {
+    pub plugin_id: String,
+    pub resource_id: String,
+    pub label: String,
+    #[serde(default)]
+    pub items: Vec<PluginResourceItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_count: Option<u64>,
+    #[serde(default)]
+    pub truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fetched_unix_ms: Option<u64>,
+    #[serde(default)]
+    pub loading: bool,
+    #[serde(default)]
+    pub refreshing: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub stale: bool,
 }

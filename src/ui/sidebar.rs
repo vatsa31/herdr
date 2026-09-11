@@ -27,6 +27,15 @@ pub(crate) struct AgentPanelEntry {
     pub tokens: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExpandedSidebarLayout {
+    pub spaces: Rect,
+    pub agents: Rect,
+    pub resource: Option<Rect>,
+    pub spaces_agents_divider: Rect,
+    pub agents_resource_divider: Rect,
+}
+
 fn sidebar_section_heights(total_height: u16, split_ratio: f32) -> (u16, u16) {
     if total_height == 0 {
         return (0, 0);
@@ -48,31 +57,74 @@ fn sidebar_section_heights(total_height: u16, split_ratio: f32) -> (u16, u16) {
 }
 
 pub(crate) fn expanded_sidebar_sections(area: Rect, split_ratio: f32) -> (Rect, Rect) {
+    let layout = expanded_sidebar_layout(area, split_ratio, false, false);
+    (layout.spaces, layout.agents)
+}
+
+pub(crate) fn expanded_sidebar_layout(
+    area: Rect,
+    split_ratio: f32,
+    has_resource: bool,
+    resource_expanded: bool,
+) -> ExpandedSidebarLayout {
     let content = Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height);
     if content.is_empty() {
-        return (Rect::default(), Rect::default());
+        return ExpandedSidebarLayout {
+            spaces: Rect::default(),
+            agents: Rect::default(),
+            resource: None,
+            spaces_agents_divider: Rect::default(),
+            agents_resource_divider: Rect::default(),
+        };
     }
-
-    let (workspace_height, detail_height) = sidebar_section_heights(content.height, split_ratio);
-    (
-        Rect::new(content.x, content.y, content.width, workspace_height),
+    let resource_height = if !has_resource {
+        0
+    } else if !resource_expanded || content.height < 10 {
+        1.min(content.height)
+    } else {
+        let desired = ((content.height as f32) * 0.32).round() as u16;
+        desired.clamp(4, content.height.saturating_sub(6))
+    };
+    let rest_height = content.height.saturating_sub(resource_height);
+    let (workspace_height, detail_height) = sidebar_section_heights(rest_height, split_ratio);
+    let spaces = Rect::new(content.x, content.y, content.width, workspace_height);
+    let agents = Rect::new(
+        content.x,
+        content.y.saturating_add(workspace_height),
+        content.width,
+        detail_height,
+    );
+    let resource = (resource_height > 0).then_some(Rect::new(
+        content.x,
+        content.y.saturating_add(workspace_height.saturating_add(detail_height)),
+        content.width,
+        resource_height,
+    ));
+    let spaces_agents_divider = if content.width == 0 || rest_height < 6 {
+        Rect::default()
+    } else {
         Rect::new(
             content.x,
-            content.y + workspace_height,
+            content.y.saturating_add(workspace_height),
             content.width,
-            detail_height,
-        ),
-    )
+            1,
+        )
+    };
+    let agents_resource_divider = resource
+        .filter(|rect| rect.height > 1 && content.width > 0)
+        .map(|rect| Rect::new(rect.x, rect.y, rect.width, 1))
+        .unwrap_or_default();
+    ExpandedSidebarLayout {
+        spaces,
+        agents,
+        resource,
+        spaces_agents_divider,
+        agents_resource_divider,
+    }
 }
 
 pub(crate) fn sidebar_section_divider_rect(area: Rect, split_ratio: f32) -> Rect {
-    let content = Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height);
-    if content.width == 0 || content.height < 6 {
-        return Rect::default();
-    }
-
-    let (workspace_height, _) = sidebar_section_heights(content.height, split_ratio);
-    Rect::new(content.x, content.y + workspace_height, content.width, 1)
+    expanded_sidebar_layout(area, split_ratio, false, false).spaces_agents_divider
 }
 
 pub(crate) fn agent_panel_entries_from(

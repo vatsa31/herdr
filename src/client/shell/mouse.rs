@@ -1001,6 +1001,22 @@ impl ClientShellState {
                     }
                     return;
                 }
+                Some(ClientChromeDrag::ResourceScrollbar { grab_row_offset }) => {
+                    if let Some(metrics) = self.hits.resource_scroll_metrics {
+                        let offset = crate::ui::scrollbar_offset_from_drag_row(
+                            metrics,
+                            self.hits.resource_scrollbar,
+                            mouse.row,
+                            *grab_row_offset,
+                        );
+                        let next = metrics.max_offset_from_bottom.saturating_sub(offset);
+                        if next != self.plugin_resource_scroll {
+                            self.plugin_resource_scroll = next;
+                            outcome.repaint = true;
+                        }
+                    }
+                    return;
+                }
                 Some(ClientChromeDrag::HelpScrollbar { grab_row_offset }) => {
                     if let (Some(metrics), Some(ClientShellOverlay::Help(help))) =
                         (self.hits.help_scroll_metrics, self.overlay.as_mut())
@@ -1285,6 +1301,7 @@ impl ClientShellState {
                     }
                     ClientChromeDrag::WorkspaceScrollbar { .. }
                     | ClientChromeDrag::AgentScrollbar { .. }
+                    | ClientChromeDrag::ResourceScrollbar { .. }
                     | ClientChromeDrag::HelpScrollbar { .. }
                     | ClientChromeDrag::ProductAnnouncementScrollbar { .. }
                     | ClientChromeDrag::ReleaseNotesScrollbar { .. } => {}
@@ -1848,6 +1865,23 @@ impl ClientShellState {
                     outcome.repaint = true;
                 }
             }
+            MouseEventKind::ScrollUp if super::contains(self.hits.resource_body, point) => {
+                let next = self.plugin_resource_scroll.saturating_sub(1);
+                if next != self.plugin_resource_scroll {
+                    self.plugin_resource_scroll = next;
+                    outcome.repaint = true;
+                }
+            }
+            MouseEventKind::ScrollDown if super::contains(self.hits.resource_body, point) => {
+                let next = self
+                    .plugin_resource_scroll
+                    .saturating_add(1)
+                    .min(self.hits.resource_max_scroll);
+                if next != self.plugin_resource_scroll {
+                    self.plugin_resource_scroll = next;
+                    outcome.repaint = true;
+                }
+            }
             MouseEventKind::Down(MouseButton::Left) => {
                 if self.selection.take().is_some() {
                     outcome.repaint = true;
@@ -1931,6 +1965,75 @@ impl ClientShellState {
                             }
                         }
                     }
+                    return;
+                }
+                if super::contains(self.hits.resource_scrollbar, point) {
+                    if let Some(metrics) = self.hits.resource_scroll_metrics {
+                        if let Some(grab_row_offset) = crate::ui::scrollbar_thumb_grab_offset(
+                            metrics,
+                            self.hits.resource_scrollbar,
+                            mouse.row,
+                        ) {
+                            self.chrome_drag =
+                                Some(ClientChromeDrag::ResourceScrollbar { grab_row_offset });
+                        } else {
+                            let offset = crate::ui::scrollbar_offset_from_row(
+                                metrics,
+                                self.hits.resource_scrollbar,
+                                mouse.row,
+                            );
+                            let next = metrics.max_offset_from_bottom.saturating_sub(offset);
+                            if next != self.plugin_resource_scroll {
+                                self.plugin_resource_scroll = next;
+                                outcome.repaint = true;
+                            }
+                        }
+                    }
+                    return;
+                }
+                if super::contains(self.hits.resource_refresh, point) {
+                    if let Some(resource) = self
+                        .snapshot
+                        .as_deref()
+                        .and_then(|snapshot| snapshot.plugin_resources.first())
+                    {
+                        self.push_endpoint_method(
+                            crate::api::schema::Method::PluginResourceRefresh(
+                                crate::api::schema::PluginResourceTarget {
+                                    plugin_id: resource.plugin_id.clone(),
+                                    resource_id: resource.resource_id.clone(),
+                                },
+                            ),
+                            outcome,
+                        );
+                    }
+                    return;
+                }
+                if super::contains(self.hits.resource_header, point) {
+                    self.plugin_resource_collapsed = !self.plugin_resource_collapsed;
+                    self.plugin_resource_collapsed_manual = true;
+                    self.persist_chrome_preferences(outcome);
+                    outcome.repaint = true;
+                    return;
+                }
+                if let Some((_, plugin_id, resource_id, item_id)) = self
+                    .hits
+                    .resource_items
+                    .iter()
+                    .find(|(rect, _, _, _)| super::contains(*rect, point))
+                {
+                    self.plugin_resource_selected = Some(item_id.clone());
+                    self.push_endpoint_method(
+                        crate::api::schema::Method::PluginResourceActivate(
+                            crate::api::schema::PluginResourceActivateParams {
+                                plugin_id: plugin_id.clone(),
+                                resource_id: resource_id.clone(),
+                                item_id: item_id.clone(),
+                            },
+                        ),
+                        outcome,
+                    );
+                    outcome.repaint = true;
                     return;
                 }
                 if super::contains(self.hits.agent_sort_toggle, point) {
