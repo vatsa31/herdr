@@ -13,7 +13,7 @@ pub(super) fn render_plugin_resource_panel(
     snapshot: &ClientShellSnapshot,
     config: &ClientShellConfig,
     collapsed: bool,
-    selected_id: Option<&str>,
+    selected: &mut Option<String>,
     scroll: &mut usize,
     hits: &mut ShellHitMap,
 ) {
@@ -23,6 +23,14 @@ pub(super) fn render_plugin_resource_panel(
     let Some(resource) = snapshot.plugin_resources.first() else {
         return;
     };
+    // v1 shows the first enabled resource only; the server may poll more.
+    // Prune a selection that no longer exists so a removed issue is not
+    // highlighted as a ghost (activation already errors server-side).
+    if let Some(id) = selected.as_deref() {
+        if !resource.items.iter().any(|item| item.id == id) {
+            *selected = None;
+        }
+    }
     let palette = &config.palette;
     put_text(
         buffer,
@@ -129,6 +137,18 @@ pub(super) fn render_plugin_resource_panel(
     *scroll = metrics
         .max_offset_from_bottom
         .saturating_sub(metrics.offset_from_bottom);
+    // Keep the selected item visible across reorder/refresh where possible.
+    if let Some(id) = selected.as_deref() {
+        if let Some(index) = resource.items.iter().position(|item| item.id == id) {
+            let visible_rows = usize::from(list.height).saturating_add(1) / 2;
+            let visible_rows = visible_rows.max(1);
+            if index < *scroll {
+                *scroll = index;
+            } else if index >= scroll.saturating_add(visible_rows) {
+                *scroll = index.saturating_add(1).saturating_sub(visible_rows);
+            }
+        }
+    }
     let show_scrollbar = metrics.max_offset_from_bottom > 0 && list.width > 1;
     let content_width = list.width.saturating_sub(u16::from(show_scrollbar));
     let mut y = list.y;
@@ -137,8 +157,8 @@ pub(super) fn render_plugin_resource_panel(
             break;
         }
         let rect = Rect::new(list.x, y, content_width, 2.min(list.bottom().saturating_sub(y)));
-        let selected = selected_id == Some(item.id.as_str());
-        if selected {
+        let selected_row = selected.as_deref() == Some(item.id.as_str());
+        if selected_row {
             buffer.set_style(rect, Style::default().bg(palette.active_row_bg));
         }
         let primary = format!("{}  {}", item.id, item.primary);

@@ -532,7 +532,7 @@ pub(super) fn render_expanded(
             snapshot,
             config,
             state.plugin_resource_collapsed,
-            state.plugin_resource_selected.as_deref(),
+            state.plugin_resource_selected,
             state.plugin_resource_scroll,
             hits,
         );
