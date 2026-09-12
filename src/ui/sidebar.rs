@@ -67,7 +67,13 @@ pub(crate) fn expanded_sidebar_layout(
     has_resource: bool,
     resource_expanded: bool,
 ) -> ExpandedSidebarLayout {
-    let content = Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height);
+    // Resource scrollbars and actions must not cover the sidebar footer toggle.
+    let content = Rect::new(
+        area.x,
+        area.y,
+        area.width.saturating_sub(1),
+        area.height.saturating_sub(u16::from(has_resource)),
+    );
     if content.is_empty() {
         return ExpandedSidebarLayout {
             spaces: Rect::default(),
@@ -96,7 +102,9 @@ pub(crate) fn expanded_sidebar_layout(
     );
     let resource = (resource_height > 0).then_some(Rect::new(
         content.x,
-        content.y.saturating_add(workspace_height.saturating_add(detail_height)),
+        content
+            .y
+            .saturating_add(workspace_height.saturating_add(detail_height)),
         content.width,
         resource_height,
     ));
