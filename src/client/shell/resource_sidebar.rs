@@ -32,22 +32,23 @@ pub(super) fn render_plugin_resource_panel(
         }
     }
     let palette = &config.palette;
-    put_text(
-        buffer,
-        area.x,
-        area.y,
-        area.width,
-        &"─".repeat(area.width as usize),
-        Style::default().fg(palette.surface_dim),
-    );
-    hits.resource_section_divider = Rect::new(area.x, area.y, area.width, 1.min(area.height));
-    if area.height < 2 {
-        return;
+    let divider_height = u16::from(area.height > 1);
+    if divider_height > 0 {
+        put_text(
+            buffer,
+            area.x,
+            area.y,
+            area.width,
+            &"─".repeat(area.width as usize),
+            Style::default().fg(palette.surface_dim),
+        );
     }
+    hits.resource_section_divider = Rect::new(area.x, area.y, area.width, divider_height);
     let marker = if collapsed { "▸" } else { "▾" };
     let count = resource_count_label(resource);
     let title = format!(" {marker} {} · {count}", resource.label);
-    let header = Rect::new(area.x, area.y + 1, area.width, 1);
+    // A one-row collapsed (or height-constrained) panel still needs its header.
+    let header = Rect::new(area.x, area.y + divider_height, area.width, 1);
     hits.resource_header = header;
     put_text(
         buffer,
@@ -60,11 +61,13 @@ pub(super) fn render_plugin_resource_panel(
             .add_modifier(Modifier::BOLD),
     );
     let refresh_label = if resource.refreshing { "…" } else { "↻" };
-    let refresh_width = display_width(refresh_label) as u16;
+    let refresh_width = (display_width(refresh_label) as u16)
+        .saturating_add(1)
+        .min(header.width);
     let refresh = Rect::new(
-        header.right().saturating_sub(refresh_width.saturating_add(1)),
+        header.right().saturating_sub(refresh_width),
         header.y,
-        refresh_width.saturating_add(1),
+        refresh_width,
         1,
     );
     hits.resource_refresh = refresh;
@@ -82,9 +85,9 @@ pub(super) fn render_plugin_resource_panel(
 
     let body = Rect::new(
         area.x,
-        area.y.saturating_add(2),
+        header.bottom(),
         area.width,
-        area.height.saturating_sub(2),
+        area.bottom().saturating_sub(header.bottom()),
     );
     hits.resource_body = body;
     if body.is_empty() {
@@ -92,7 +95,8 @@ pub(super) fn render_plugin_resource_panel(
     }
 
     let status = resource_status_line(resource);
-    if let Some(status) = status.filter(|_| resource.items.is_empty() || resource.stale || resource.loading)
+    if let Some(status) =
+        status.filter(|_| resource.items.is_empty() || resource.stale || resource.loading)
     {
         put_text(
             buffer,
@@ -156,7 +160,12 @@ pub(super) fn render_plugin_resource_panel(
         if y.saturating_add(2) > list.bottom() {
             break;
         }
-        let rect = Rect::new(list.x, y, content_width, 2.min(list.bottom().saturating_sub(y)));
+        let rect = Rect::new(
+            list.x,
+            y,
+            content_width,
+            2.min(list.bottom().saturating_sub(y)),
+        );
         let selected_row = selected.as_deref() == Some(item.id.as_str());
         if selected_row {
             buffer.set_style(rect, Style::default().bg(palette.active_row_bg));
@@ -199,7 +208,11 @@ fn resource_count_label(resource: &crate::api::schema::PluginResourceCollection)
     if resource.loading && resource.items.is_empty() {
         return "…".into();
     }
-    if let Some(error) = resource.error.as_ref().filter(|_| resource.items.is_empty()) {
+    if let Some(error) = resource
+        .error
+        .as_ref()
+        .filter(|_| resource.items.is_empty())
+    {
         let _ = error;
         return "!".into();
     }
@@ -215,9 +228,7 @@ fn resource_count_label(resource: &crate::api::schema::PluginResourceCollection)
         .unwrap_or_else(|| resource.items.len().to_string())
 }
 
-fn resource_status_line(
-    resource: &crate::api::schema::PluginResourceCollection,
-) -> Option<String> {
+fn resource_status_line(resource: &crate::api::schema::PluginResourceCollection) -> Option<String> {
     if resource.loading && resource.items.is_empty() {
         return Some(" loading…".into());
     }
