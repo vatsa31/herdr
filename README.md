@@ -1,5 +1,70 @@
 # herdr
 
+> [!NOTE]
+> This is a fork of [herdrdev/herdr](https://github.com/herdrdev/herdr). The
+> upstream project is a terminal workspace manager for coding agents. This fork
+> adds a generic plugin-resource API and a native resource section in the
+> sidebar, developed to support the companion
+> [Jira sidebar plugin](https://github.com/vatsa31/herdr-jira).
+
+## what this fork adds
+
+Upstream Herdr plugins can provide commands, event hooks, and terminal panes,
+but they cannot place live data in Herdr's native sidebar. This fork adds that
+missing extension point while keeping the host implementation independent of
+Jira or any other service.
+
+```text
+Before                            With this fork
+────────────────────────          ────────────────────────
+Workspaces                        Workspaces
+Agents                            Agents
+                                  My Jira issues · 8
+                                    PROJ-142  Fix timeout
+                                              In Progress
+```
+
+The implementation includes:
+
+- additive `[[resources]]` plugin manifest entries;
+- `plugin.resource.list`, `plugin.resource.refresh`, and
+  `plugin.resource.activate` APIs;
+- server-owned polling with bounded provider execution, a 60-second default
+  refresh, stale-data retention, and protection against obsolete responses;
+- a collapsible, independently scrollable sidebar section with mouse activation
+  and manual refresh;
+- structured activation that lets a plugin open the selected resource in an
+  existing or new pane; and
+- regression coverage for resource selection, resizing, collapse/reopen, and
+  sidebar mouse-hit boundaries.
+
+The work is documented in [PR #1](https://github.com/vatsa31/herdr/pull/1)
+and the follow-up interaction fixes in
+[PR #2](https://github.com/vatsa31/herdr/pull/2). It has been exercised with
+mock data on Linux and with real Jira data on Apple Silicon macOS. The Jira API,
+authentication, filtering, and issue rendering remain in the plugin rather than
+Herdr core.
+
+### build this fork
+
+The installer, Homebrew formula, release badges, and update channel below refer
+to upstream Herdr and do not contain this fork's sidebar changes. Build this
+fork from source to use them:
+
+```bash
+git clone https://github.com/vatsa31/herdr.git
+cd herdr
+cargo build --release --locked
+./target/release/herdr
+```
+
+Building currently requires Rust, platform build tools, and Zig 0.16.0. Pair
+this binary with the companion
+[`vatsa31/herdr-jira`](https://github.com/vatsa31/herdr-jira) fork. Pin both
+revisions for a reproducible installation; running the upstream updater will
+replace a custom binary.
+
+## upstream project
 
 <p align="center">
   <img src="assets/logo.png" alt="herdr" width="100" />
@@ -40,6 +105,10 @@ https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
 ---
 
 ## install
+
+> [!IMPORTANT]
+> The commands in this section install upstream Herdr. Use
+> [build this fork](#build-this-fork) for the plugin-resource sidebar.
 
 ```bash
 curl -fsSL https://herdr.dev/install.sh | sh
